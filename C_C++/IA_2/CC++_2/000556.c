@@ -22,7 +22,8 @@ typedef struct bigint
 	bool is_negative;
 } bigint;
 
-// declarations for long arithmetic
+// declarations
+// for long arithmetic
 static int8_t const BIGINT_BASE_DEC = 4;
 static int16_t const BIGINT_BASE = 10000;
 
@@ -35,7 +36,7 @@ lex create_lex();
 void free_lex(lex * const);
 status read_lex(lex * const);
 void print_lex(lex const * const);
-status calc_expression(bigint * const);
+status calc_expression(lex * const, bigint * const);
 status expression(lex * const, bigint * const);
 status term(lex * const, bigint * const);
 status factor(lex * const, bigint * const);
@@ -90,6 +91,8 @@ void free_lex(lex * const l)
 	return;
 }
 
+
+// for code useability break instead of many return statements
 status read_lex(lex * const l)
 {
 	if (!l)
@@ -97,7 +100,6 @@ status read_lex(lex * const l)
 	free_lex(l);
 	*l = create_lex();
 	char cur;
-	status st = SUCCESS;
 	while (true)
 	{
 		cur = getchar();
@@ -113,45 +115,50 @@ status read_lex(lex * const l)
 				}
 				l->val[l->size - 1] = cur;
 			}
+			//l->val = (char *)realloc(l->val, ++l->size * sizeof(char));
+			//if (!l->val) {
+				//free_lex(l);
+				//return MEMORY_ERROR;
+			//}
+			//l->val[l->size - 1] = '\0';
 			ungetc(cur, stdin);
-			break;
+			return SUCCESS;
 		}
 		else if (cur == '(') {
 			l->type = OPEN;
-			break;
+			return SUCCESS;
 		}
 		else if (cur == ')') {
 			l->type = CLOSE;
-			break;
+			return SUCCESS;
 		}
 		else if (cur == '+') {
 			l->type = PLUS;
-			break;
+			return SUCCESS;
 		}
 		else if (cur == '-') {
 			l->type = MINUS;
-			break;
+			return SUCCESS;
 		}
 		else if (cur == '*') {
 			l->type = MUL;
-			break;
+			return SUCCESS;
 		}
 		else if (cur == '/') {
 			l->type = DIV;
-			break;
+			return SUCCESS;
 		}
 		else if (cur == EOF || cur == '\n') {
 			l->type = EOF_LEX;
-			break;
+			return SUCCESS;
 		}
-		else if (!iswspace(cur)) {
+		else if (!iswspace(cur) /*&& cur != '\n'*/) { // TODO: check if \n is a bad symbol (while tests)
 			free_lex(l);
-			st = LEX_ERROR;
-			break;
+			return LEX_ERROR;
 		}
 	}
 
-	return st;
+	return SUCCESS;
 }
 
 void print_lex(lex const * const l)
@@ -191,27 +198,29 @@ void print_lex(lex const * const l)
 	return;
 }
 
-status calc_expression(bigint * const res)
+// release memory outside
+// lexeme must use only inside of this function (no need for pass it as a param)
+status calc_expression(lex * const lexeme, bigint * const res)
 {
 	status st;
-	lex lexeme = create_lex();
 	free_bigint(res);
+	free_lex(lexeme);
 	// read first lexeme
-	if ((st = read_lex(&lexeme)) != SUCCESS)
+	if ((st = read_lex(lexeme)) != SUCCESS)
 		return st;
-	if (lexeme.type == EOF_LEX)
+	if (lexeme->type == EOF_LEX)
 		return SUCCESS;
-	if ((st = expression(&lexeme, res)) != SUCCESS) {
-		free_lex(&lexeme);
+	if ((st = expression(lexeme, res)) != SUCCESS) {
+		free_lex(lexeme);
 		free_bigint(res);
 		return st;
 	}
-	if (lexeme.type != EOF_LEX) {
-		free_lex(&lexeme);
+	if (lexeme->type != EOF_LEX) {
+		free_lex(lexeme);
 		free_bigint(res);
 		return SYNT_ERROR;
 	}
-	free_lex(&lexeme);
+	free_lex(lexeme);
 	return SUCCESS;
 }
 
@@ -800,12 +809,14 @@ status bigint_div(bigint * const res, bigint const * const left, bigint const * 
 int main(int argc, char ** argv)
 {
 	status st;
+	lex lexeme = create_lex();
 	bigint res = create_bigint();
-	if ((st = calc_expression(&res) != SUCCESS) ){
+	if ((st = calc_expression(&lexeme, &res) != SUCCESS) ){
 		print_err();
 		return SUCCESS;
 	}
 	print_bigint(&res);
 	free_bigint(&res);
+	free_lex(&lexeme);
 	return SUCCESS;
 }
